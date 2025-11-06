@@ -1,0 +1,7 @@
+# Core packages cho code của bạn
+tensorflow==2.15.0
+torch==2.1.2+cu121
+deepface==0.0.79
+opencv-python==4.8.1.78
+pandas==2.1.4
+numpy==1.26.4
