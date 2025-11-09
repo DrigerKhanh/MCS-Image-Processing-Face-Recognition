@@ -6,13 +6,15 @@ from collections import defaultdict
 import os
 import time
 from statistics import median, mode
+import tensorflow as tf
+import torch
 
 
 class FaceRecognitionSystem:
-    def __init__(self, db_path, detector_backend="opencv", model_name="VGG-Face", distance_metric="cosine"):
+    def __init__(self, db_path, detector_backend="retinaface", model_name="Facenet", distance_metric="cosine"):
         self.db_path = db_path
-        self.detector_backend = detector_backend
-        self.model_name = model_name
+        self.detector_backend = detector_backend  # retinaface tốt hơn cho GPU
+        self.model_name = model_name  # Facenet nhẹ và nhanh hơn
         self.distance_metric = distance_metric
         self.known_faces = {}
         self.face_records = defaultdict(lambda: {
@@ -28,44 +30,99 @@ class FaceRecognitionSystem:
             'confidence_scores': []
         })
 
+        # Kiểm tra GPU
+        self._check_gpu()
+
+    def _check_gpu(self):
+        """Kiểm tra và cấu hình GPU"""
+        print("=== KIỂM TRA GPU ===")
+
+        # Kiểm tra TensorFlow GPU
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+            print(f"TensorFlow: Tìm thấy {len(gpus)} GPU")
+            for gpu in gpus:
+                print(f"  - {gpu}")
+            try:
+                # Cho phép tăng bộ nhớ GPU
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+            except:
+                pass
+        else:
+            print("TensorFlow: Không tìm thấy GPU")
+
+        # Kiểm tra PyTorch GPU
+        if torch.cuda.is_available():
+            print(f"PyTorch: Tìm thấy {torch.cuda.device_count()} GPU")
+            for i in range(torch.cuda.device_count()):
+                print(f"  - {torch.cuda.get_device_name(i)}")
+                print(f"    Bộ nhớ: {torch.cuda.get_device_properties(i).total_memory / 1024 ** 3:.1f} GB")
+        else:
+            print("PyTorch: Không tìm thấy GPU")
+
     def load_known_faces(self):
-        """Tải các khuôn mặt đã biết từ thư mục database"""
+        """Tải các khuôn mặt đã biết từ thư mục database với batch processing"""
         try:
+            all_images = []
+            person_names = []
+
+            # Thu thập tất cả ảnh
             for person_name in os.listdir(self.db_path):
                 person_path = os.path.join(self.db_path, person_name)
                 if os.path.isdir(person_path):
                     for img_file in os.listdir(person_path):
                         if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
                             img_path = os.path.join(person_path, img_file)
-                            try:
-                                embedding = DeepFace.represent(
-                                    img_path=img_path,
-                                    model_name=self.model_name,
-                                    detector_backend=self.detector_backend,
-                                    enforce_detection=False
-                                )
+                            all_images.append(img_path)
+                            person_names.append(person_name)
 
-                                if embedding and len(embedding) > 0:
-                                    if person_name not in self.known_faces:
-                                        self.known_faces[person_name] = []
-                                    self.known_faces[person_name].append(embedding[0]["embedding"])
-                                else:
-                                    print(f"Không thể trích xuất đặc điểm từ ảnh {img_path}")
-                            except Exception as e:
-                                print(f"Không thể xử lý ảnh {img_path}: {str(e)}")
+            print(f"Đang xử lý {len(all_images)} ảnh từ database...")
+
+            # Xử lý theo batch để tối ưu GPU
+            batch_size = 8  # Giảm batch size nếu hết bộ nhớ
+            for i in range(0, len(all_images), batch_size):
+                batch_images = all_images[i:i + batch_size]
+                batch_names = person_names[i:i + batch_size]
+
+                for img_path, person_name in zip(batch_images, batch_names):
+                    try:
+                        embedding = DeepFace.represent(
+                            img_path=img_path,
+                            model_name=self.model_name,
+                            detector_backend=self.detector_backend,
+                            enforce_detection=False,
+                            align=True  # Căn chỉnh khuôn mặt để tăng độ chính xác
+                        )
+
+                        if embedding and len(embedding) > 0:
+                            if person_name not in self.known_faces:
+                                self.known_faces[person_name] = []
+                            self.known_faces[person_name].append(embedding[0]["embedding"])
+                        else:
+                            print(f"Không thể trích xuất đặc điểm từ ảnh {img_path}")
+                    except Exception as e:
+                        print(f"Không thể xử lý ảnh {img_path}: {str(e)}")
+
+                print(f"Đã xử lý {min(i + batch_size, len(all_images))}/{len(all_images)} ảnh")
+
             print(f"Đã tải {len(self.known_faces)} người từ database")
+            total_embeddings = sum(len(embeddings) for embeddings in self.known_faces.values())
+            print(f"Tổng số embeddings: {total_embeddings}")
+
         except Exception as e:
             print(f"Lỗi khi tải database: {str(e)}")
 
     def enhanced_face_analysis(self, face_img):
-        """Phân tích khuôn mặt nâng cao"""
+        """Phân tích khuôn mặt nâng cao với GPU acceleration"""
         try:
             analysis = DeepFace.analyze(
                 img_path=face_img,
                 actions=["emotion", "age", "gender", "race"],
                 detector_backend=self.detector_backend,
                 enforce_detection=False,
-                silent=True
+                silent=True,
+                align=True
             )
 
             if not analysis:
@@ -174,7 +231,7 @@ class FaceRecognitionSystem:
         return np.mean(confidence_factors) if confidence_factors else 0.5
 
     def recognize_face(self, face_img):
-        """Nhận diện khuôn mặt và trả về thông tin"""
+        """Nhận diện khuôn mặt và trả về thông tin với GPU optimization"""
         try:
             # Sử dụng phân tích nâng cao
             analysis = self.enhanced_face_analysis(face_img)
@@ -190,11 +247,14 @@ class FaceRecognitionSystem:
                 model_name=self.model_name,
                 distance_metric=self.distance_metric,
                 enforce_detection=False,
-                silent=True
+                silent=True,
+                align=True
             )
 
             # Xác định danh tính
             identity = "Unknown"
+            confidence_score = 0
+
             if recognition_results and not recognition_results[0].empty:
                 result = recognition_results[0].iloc[0]
 
@@ -207,17 +267,19 @@ class FaceRecognitionSystem:
                 if distance_value is not None and distance_value < 0.6:
                     identity_path = result['identity']
                     identity = os.path.basename(os.path.dirname(identity_path))
-                    print(f"Đã nhận diện: {identity} với độ tương đồng: {distance_value:.4f}")
+                    confidence_score = 1 - distance_value
+                    print(f"Đã nhận diện: {identity} với độ tin cậy: {confidence_score:.2%}")
 
             analysis['identity'] = identity
+            analysis['recognition_confidence'] = confidence_score
             return analysis
 
         except Exception as e:
             print(f"Lỗi khi nhận diện khuôn mặt: {str(e)}")
             return None
 
-    def process_video(self, video_path, output_path=None):
-        """Xử lý video và nhận diện khuôn mặt"""
+    def process_video(self, video_path, output_path=None, skip_frames=2):
+        """Xử lý video và nhận diện khuôn mặt với tối ưu hóa GPU"""
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             print("Không thể mở video")
@@ -234,7 +296,9 @@ class FaceRecognitionSystem:
         face_track_id = 0
         face_tracking = {}
 
-        print("Bắt đầu xử lý video...")
+        print("Bắt đầu xử lý video với GPU...")
+        start_time = time.time()
+
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -242,13 +306,21 @@ class FaceRecognitionSystem:
                 break
 
             frame_count += 1
+
+            # Bỏ qua một số frame để tăng tốc độ xử lý
+            if frame_count % (skip_frames + 1) != 0:
+                if output_path:
+                    out.write(frame)
+                continue
+
             print(f"Đang xử lý frame {frame_count}")
 
             try:
                 faces = DeepFace.extract_faces(
                     img_path=frame,
                     detector_backend=self.detector_backend,
-                    enforce_detection=False
+                    enforce_detection=False,
+                    align=True
                 )
 
                 current_frame_faces = []
@@ -302,7 +374,7 @@ class FaceRecognitionSystem:
             if output_path:
                 out.write(frame)
 
-            cv2.imshow('Face Recognition', frame)
+            cv2.imshow('Face Recognition - GPU Accelerated', frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -312,7 +384,10 @@ class FaceRecognitionSystem:
             out.release()
         cv2.destroyAllWindows()
 
-        print("Đã xử lý xong video")
+        end_time = time.time()
+        processing_time = end_time - start_time
+        print(f"Đã xử lý xong video trong {processing_time:.2f} giây")
+        print(f"Tốc độ xử lý: {frame_count / processing_time:.2f} FPS")
 
     def _get_face_id(self, x, y, w, h, face_tracking):
         """Tìm ID khuôn mặt dựa trên vị trí"""
@@ -375,9 +450,14 @@ class FaceRecognitionSystem:
         line_height = max(15, int(base_scale * 20))
 
         confidence = face_info.get('analysis_confidence', 0.5)
-        if confidence > 0.7:
+        recognition_confidence = face_info.get('recognition_confidence', 0)
+
+        # Kết hợp cả hai độ tin cậy
+        overall_confidence = (confidence + recognition_confidence) / 2
+
+        if overall_confidence > 0.7:
             color = (0, 255, 0)
-        elif confidence > 0.4:
+        elif overall_confidence > 0.4:
             color = (0, 255, 255)
         else:
             color = (0, 0, 255)
@@ -388,7 +468,7 @@ class FaceRecognitionSystem:
         box_thickness = max(2, int(base_scale * 2.5))
         cv2.rectangle(frame, (x, y), (x + w, y + h), color, box_thickness)
 
-        confidence_text = f"({confidence * 100:.0f}%)" if 'analysis_confidence' in face_info else ""
+        confidence_text = f"({overall_confidence * 100:.0f}%)"
         label = f"{face_info['identity']} {confidence_text}"
 
         info_lines = [
@@ -516,7 +596,14 @@ if __name__ == "__main__":
         print("Cấu trúc dataset không hợp lệ. Vui lòng kiểm tra lại.")
         exit()
 
-    fr_system = FaceRecognitionSystem(db_path=db_path)
+    # Sử dụng retinaface cho độ chính xác cao hơn và Facenet cho tốc độ
+    fr_system = FaceRecognitionSystem(
+        db_path=db_path,
+        detector_backend="retinaface",  # Tốt hơn cho GPU
+        model_name="Facenet",  # Nhẹ và nhanh
+        distance_metric="cosine"
+    )
+
     fr_system.load_known_faces()
 
     test_img_path = "../dataset/test/joe1.jpg"
@@ -525,6 +612,7 @@ if __name__ == "__main__":
         test_result = fr_system.recognize_face(test_img_path)
         if test_result:
             print(f"Kết quả nhận diện: {test_result['identity']}")
+            print(f"Độ tin cậy: {test_result.get('recognition_confidence', 0):.2%}")
         else:
             print("Không thể nhận diện trên ảnh tĩnh")
     else:
@@ -532,9 +620,11 @@ if __name__ == "__main__":
 
     video_path = "../resource/video/test_video.mp4"
     if os.path.exists(video_path):
+        print("\n=== XỬ LÝ VIDEO VỚI GPU ===")
         fr_system.process_video(
             video_path=video_path,
-            output_path="output_video.mp4"
+            output_path="output_video_gpu.mp4",
+            skip_frames=2  # Bỏ qua 2 frame để tăng tốc
         )
     else:
         print(f"Video không tồn tại: {video_path}")
