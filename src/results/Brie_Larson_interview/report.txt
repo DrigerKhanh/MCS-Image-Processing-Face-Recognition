@@ -1,0 +1,52 @@
+=== BÁO CÁO TỔNG HỢP CÁC KHUÔN MẶT TRONG VIDEO ===
+
+--- brie_larson ---
+Số lần xuất hiện: 7885
+Frame đầu tiên: 1
+Frame cuối cùng: 10507
+Giới tính: Woman
+Tuổi (trung vị): 29 từ 21 đến 39
+Phân tích cảm xúc chi tiết:
+  - fear: 21.1%
+  - sad: 14.6%
+  - neutral: 46.6%
+Phân tích chủng tộc chi tiết:
+  - asian: 13.1%
+  - white: 57.3%
+  - middle eastern: 10.9%
+  - latino hispanic: 15.4%
+Độ tin cậy trung bình: 65.3%
+Ảnh đại diện đã lưu: output_faces/brie_larson.jpg
+
+--- Unknown ---
+Số lần xuất hiện: 609
+Frame đầu tiên: 490
+Frame cuối cùng: 10360
+Giới tính: Woman
+Tuổi (trung vị): 30 từ 22 đến 42
+Phân tích cảm xúc chi tiết:
+  - fear: 13.3%
+  - sad: 38.0%
+  - neutral: 34.2%
+Phân tích chủng tộc chi tiết:
+  - asian: 22.4%
+  - white: 62.6%
+Độ tin cậy trung bình: 68.1%
+Ảnh đại diện đã lưu: output_faces/Unknown.jpg
+
+--- putin ---
+Số lần xuất hiện: 486
+Frame đầu tiên: 2147
+Frame cuối cùng: 9380
+Giới tính: Man
+Tuổi (trung vị): 29.0 từ 22 đến 39
+Phân tích cảm xúc chi tiết:
+  - fear: 15.8%
+  - happy: 12.1%
+  - sad: 41.6%
+  - neutral: 21.1%
+Phân tích chủng tộc chi tiết:
+  - asian: 10.9%
+  - white: 76.8%
+Độ tin cậy trung bình: 69.4%
+Ảnh đại diện đã lưu: output_faces/putin.jpg
