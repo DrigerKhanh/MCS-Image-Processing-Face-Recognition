@@ -9,7 +9,7 @@ from statistics import median, mode
 
 
 class FaceRecognitionSystem:
-    def __init__(self, db_path, detector_backend="retinaface", model_name="Facenet", distance_metric="cosine"):
+    def __init__(self, db_path, detector_backend="retinaface", model_name="VGG-Face", distance_metric="cosine"):
         self.db_path = db_path
         self.detector_backend = detector_backend
         self.model_name = model_name
@@ -60,8 +60,25 @@ class FaceRecognitionSystem:
     def enhanced_face_analysis(self, face_img):
         """Phân tích khuôn mặt nâng cao"""
         try:
+            # Kiểm tra kiểu dữ liệu đầu vào
+            if isinstance(face_img, str):
+                # Nếu là đường dẫn, đọc ảnh
+                if os.path.exists(face_img):
+                    face_img = cv2.imread(face_img)
+                else:
+                    print(f"Đường dẫn ảnh không tồn tại: {face_img}")
+                    return None
+            elif not isinstance(face_img, np.ndarray):
+                print(f"Định dạng ảnh không hỗ trợ: {type(face_img)}")
+                return None
+
+            # Kiểm tra kích thước ảnh
+            if face_img.size == 0:
+                print("Ảnh rỗng")
+                return None
+
             analysis = DeepFace.analyze(
-                img_path=face_img,
+                img_path=face_img,  # Truyền trực tiếp image array
                 actions=["emotion", "age", "gender", "race"],
                 detector_backend=self.detector_backend,
                 enforce_detection=False,
@@ -223,7 +240,8 @@ class FaceRecognitionSystem:
                 if distance_value is not None and distance_value < threshold:
                     identity_path = result['identity']
                     identity = os.path.basename(os.path.dirname(identity_path))
-                    print(f"Đã nhận diện: {identity} với độ tương đồng: {distance_value:.4f}")
+                    confidence = 1 - distance_value
+                    print(f"Đã nhận diện: {identity} với độ tương đồng: {confidence:.4f}, distance: {distance_value:.4f}")
                 else:
                     print(f"Distance quá cao: {distance_value:.4f} (ngưỡng: {threshold})")
 
