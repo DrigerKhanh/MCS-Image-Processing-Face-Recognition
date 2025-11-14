@@ -9,7 +9,7 @@ from statistics import median, mode
 
 
 class FaceRecognitionSystem:
-    def __init__(self, db_path, detector_backend="retinaface", model_name="VGG-Face", distance_metric="cosine"):
+    def __init__(self, db_path, detector_backend="retinaface", model_name="Facenet", distance_metric="cosine"):
         self.db_path = db_path
         self.detector_backend = detector_backend
         self.model_name = model_name
