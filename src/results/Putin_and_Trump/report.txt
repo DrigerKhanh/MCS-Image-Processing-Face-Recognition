@@ -1,0 +1,39 @@
+=== BÁO CÁO TỔNG HỢP CÁC KHUÔN MẶT TRONG VIDEO ===
+
+--- putin ---
+Số lần xuất hiện: 839
+Frame đầu tiên: 1
+Frame cuối cùng: 591
+Giới tính: Man
+Tuổi (trung vị): 40 từ 25 đến 54
+Phân tích cảm xúc chi tiết:
+  - fear: 13.2%
+  - happy: 40.1%
+  - neutral: 29.5%
+Phân tích chủng tộc chi tiết:
+  - asian: 20.6%
+  - white: 45.1%
+  - middle eastern: 10.3%
+  - latino hispanic: 15.9%
+Độ tin cậy trung bình: 63.9%
+Ảnh đại diện đã lưu: output_faces/putin.jpg
+
+--- Unknown ---
+Số lần xuất hiện: 604
+Frame đầu tiên: 1
+Frame cuối cùng: 591
+Giới tính: Man
+Tuổi (trung vị): 43.0 từ 31 đến 59
+Phân tích cảm xúc chi tiết:
+  - angry: 15.8%
+  - fear: 33.0%
+  - happy: 19.4%
+  - neutral: 15.1%
+Phân tích chủng tộc chi tiết:
+  - asian: 44.8%
+  - white: 26.1%
+  - latino hispanic: 13.7%
+Độ tin cậy trung bình: 68.7%
+Ảnh đại diện đã lưu: output_faces/Unknown.jpg
+
+Process finished with exit code 0
