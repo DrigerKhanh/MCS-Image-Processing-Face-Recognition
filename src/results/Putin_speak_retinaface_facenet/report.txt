@@ -1,0 +1,142 @@
+1. Feature Pyramid Network (FPN)
+FPN là kiến trúc mạng neural giải quyết vấn đề phát hiện vật thể đa tỷ lệ bằng cách kết hợp các feature maps từ nhiều tầng khác nhau.
+
+CƠ CHẾ HOẠT ĐỘNG:
+- Bottom-up pathway: Luồng đi lên từ input image qua các convolutional layer, mỗi layer trích xuất features ở độ phân giải khác nhau
+- Top-down pathway: Luồng đi xuống - upsample các feature maps có độ phân giải thấp nhưng semantic cao
+- Lateral connections: Kết nối ngang - kết hợp features từ bottom-up và top-down để tạo ra feature maps giàu cả semantic và spatial information
+
+ỨNG DỤNG TRONG FACE DETECTION:
+- P5 (độ phân giải thấp): Phát hiện khuôn mặt lớn, nhận diện ngữ cảnh
+- P4 (độ phân giải trung): Phát hiện khuôn mặt trung bình
+- P3 (độ phân giải cao): Phát hiện khuôn mặt nhỏ, giữ chi tiết
+
+# Vấn đề: Faces có nhiều kích thước khác nhau
+face_sizes = ['very_small', 'small', 'medium', 'large', 'very_large']
+# Mạng CNN thông thường chỉ detect tốt 1 scale
+
+2. Kiến trúc Inception-ResNet backbone
+Đây là sự kết hợp của 2 “đỉnh cao”:
+- Inception: chia nhánh 1×1, 3×3, 5×5 → trích xuất nhiều kiểu đặc trưng song song.
+- ResNet: skip-connection để tránh gradient vanishing.
+
+Inception-ResNet = Inception Blocks + Residual Connection
+Lợi ích:
+- Học nhiều loại feature khác nhau (texture, shape, pattern).
+- Dễ train hơn, độ sâu lớn (100 – 200 layer) mà không nổ gradient.
+
+FaceNet và nhiều model embedding hiện dùng backbone này vì đặc trưng khuôn mặt rất “giàu thông tin”.
+
+3. Triplet Loss Learning
+MỤC TIÊU: Học một embedding space nơi các samples cùng class gần nhau và samples khác class xa nhau.
+TÁC DỤNG: Tạo ra clusters trong embedding space - các khuôn mặt cùng người tập trung thành cụm.
+
+4. Không gian vector: similar faces gần nhau?
+ĐỊNH NGHĨA:
+Không gian vector đa chiều (thường 128-512 dimensions) nơi mỗi khuôn mặt được biểu diễn bằng một điểm.
+
+Khi đưa ảnh qua mô hình (FaceNet, ArcFace…), bạn nhận được một vector 128–512 chiều.
+Trong không gian này:
+- Ảnh cùng người → vector rất gần nhau.
+- Ảnh khác người → vector cách xa.
+
+Các khoảng cách thường tính bằng:
+- L2 distance,
+- Cosine distance.
+→ Đây là lý do dùng “face distance” thay vì softmax.
+
+KHOẢNG CÁCH COSINE:
+Đo độ tương đồng dựa trên góc giữa hai vectors:
+- 1.0: Hoàn toàn giống nhau
+- 0.0: Không tương quan
+- -1.0: Hoàn toàn đối lập
+
+5. Confidence score tính thế nào? 
+THÀNH PHẦN ĐÁNH GIÁ:
+a. Detection Confidence:
+- Quality of facial landmarks detection
+- Face alignment accuracy
+- Image resolution và illumination conditions
+
+b. Recognition Confidence:
+- Khoảng cách tới nearest neighbor trong embedding space
+- Margin giữa top-1 và top-2 matches
+- Quality của facial features extraction
+
+c. Analysis Confidence:
+- Agreement between multiple analysis modules
+- Consistency across temporal frames
+- Feature extraction quality scores
+
+6. Phân tích đa thuộc tính trong code hoạt động thế nào?
+KIẾN TRÚC MULTI-TASK LEARNING:
+a. Shared Feature Encoder:
+- Backbone CNN trích xuất generic facial features
+- Features được shared across all tasks
+
+b. Specialized Task Heads:
+- Age Estimation: Regression head với continuous output
+- Gender Classification: Binary classification head
+- Emotion Recognition: Multi-class classification (7 emotions)
+- Race/Ethnicity: Multi-class classification (5 races)
+
+7. Adaptive threshold tại sao lại khác nhau giữa các model?
+Bởi vì:
+- Mỗi mô hình tạo ra embedding space khác nhau.
+- Khoảng cách giữa cùng người và khác người không giống nhau giữa model A và B.
+- Một mô hình có embedding “rải đều”, mô hình khác “nén chặt”.
+
+Ví dụ:
+- Model A: khoảng cách A–P ≈ 0.6 và A–N ≈ 1.5 → threshold ~ 1.0
+- Model B: embedding chuẩn hóa → khoảng cách A–P ≈ 0.3 và A–N ≈ 0.8 → threshold ~ 0.5
+- Không thể xài chung threshold giữa ArcFace vs FaceNet vs SFace.
+
+
+8. RetinaFace model? 
+RetinaFace = “trùm” face detection.
+Công dụng: tìm khuôn mặt + landmark + bbox cực chuẩn.
+Công nghệ chính:
+- Backbone: ResNet / MobileNet
+- FPN để multi-scale
+- Multi-task heads: classify + bbox + landmark
+-Facial priors + context module → cực nhạy với mặt nhỏ
+
+Ưu điểm:
+- Cực nhanh
+- Cực chính xác
+- Rất tốt với mặt nghiêng, mờ, nhỏ
+
+Thường dùng trước FaceNet để cắt mặt.
+
+9. FaceNet model?
+FaceNet = mô hình sinh ra vector embedding khuôn mặt.
+
+Ý tưởng:
+Không phân loại tên người trực tiếp → học embedding.
+
+Công nghệ cốt lõi:
+- Triplet Loss
+- Inception-ResNet (ở bản tốt nhất)
+- Embedding 128d hoặc 512d
+- Dùng khoảng cách để so sánh
+
+Ưu điểm:
+- Chính xác cao
+- Tổng quát tốt
+- Tách biệt rõ người này / người khác
+- Không cần train lại khi thêm người mới (chỉ lưu vector)
+
+10, Lý do sản phẩm của bạn có giá trị?
+- Dễ triển khai (vài dòng code)
+- Dễ sử dụng (chỉ cần bỏ data người cần nhận diện, và bấm chạy)
+- Có sẵn multiple models (VGG, Facenet, ArcFace...)
+- Tích hợp sẵn analysis (age, gender, emotion)
+- Community support tốt
+
+11. Nhược điểm của YOLO?
+- Chi phí ẩn cực cao (GPU Infrastructure)
+- Chỉ làm detection (Chỉ output bounding boxes + confidence scores), Không có facial analysis (age, gender, emotion), 
+- Limited analysis capabilities 
+        Muốn emotion analysis? Cần train model riêng
+        Muốn age/gender estimation? Cần additional models
+        Muốn face recognition? Cần separate embedding system

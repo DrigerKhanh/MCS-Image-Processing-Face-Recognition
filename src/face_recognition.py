@@ -9,7 +9,7 @@ from statistics import median, mode
 
 
 class FaceRecognitionSystem:
-    def __init__(self, db_path, detector_backend="opencv", model_name="VGG-Face", distance_metric="cosine"):
+    def __init__(self, db_path, detector_backend="retinaface", model_name="Facenet", distance_metric="cosine"):
         self.db_path = db_path
         self.detector_backend = detector_backend
         self.model_name = model_name
@@ -60,8 +60,25 @@ class FaceRecognitionSystem:
     def enhanced_face_analysis(self, face_img):
         """Phân tích khuôn mặt nâng cao"""
         try:
+            # Kiểm tra kiểu dữ liệu đầu vào
+            if isinstance(face_img, str):
+                # Nếu là đường dẫn, đọc ảnh
+                if os.path.exists(face_img):
+                    face_img = cv2.imread(face_img)
+                else:
+                    print(f"Đường dẫn ảnh không tồn tại: {face_img}")
+                    return None
+            elif not isinstance(face_img, np.ndarray):
+                print(f"Định dạng ảnh không hỗ trợ: {type(face_img)}")
+                return None
+
+            # Kiểm tra kích thước ảnh
+            if face_img.size == 0:
+                print("Ảnh rỗng")
+                return None
+
             analysis = DeepFace.analyze(
-                img_path=face_img,
+                img_path=face_img,  # Truyền trực tiếp image array
                 actions=["emotion", "age", "gender", "race"],
                 detector_backend=self.detector_backend,
                 enforce_detection=False,
@@ -195,6 +212,8 @@ class FaceRecognitionSystem:
 
             # Xác định danh tính
             identity = "Unknown"
+            confidence = 0.0
+
             if recognition_results and not recognition_results[0].empty:
                 result = recognition_results[0].iloc[0]
 
@@ -204,10 +223,27 @@ class FaceRecognitionSystem:
                 elif self.distance_metric in result:
                     distance_value = result[self.distance_metric]
 
-                if distance_value is not None and distance_value < 0.6:
+                # Điều chỉnh ngưỡng cho từng model
+                threshold_map = {
+                    "VGG-Face": 0.6,
+                    "Facenet": 0.4,  # Giảm ngưỡng cho Facenet
+                    "Facenet512": 0.3,
+                    "OpenFace": 0.1,
+                    "DeepFace": 0.23,
+                    "DeepID": 0.015,
+                    "ArcFace": 0.68,
+                    "SFace": 0.593
+                }
+
+                threshold = threshold_map.get(self.model_name, 0.4)
+
+                if distance_value is not None and distance_value < threshold:
                     identity_path = result['identity']
                     identity = os.path.basename(os.path.dirname(identity_path))
-                    print(f"Đã nhận diện: {identity} với độ tương đồng: {distance_value:.4f}")
+                    confidence = 1 - distance_value
+                    print(f"Đã nhận diện: {identity} với độ tương đồng: {confidence:.4f}, distance: {distance_value:.4f}")
+                else:
+                    print(f"Distance quá cao: {distance_value:.4f} (ngưỡng: {threshold})")
 
             analysis['identity'] = identity
             return analysis
@@ -530,7 +566,7 @@ if __name__ == "__main__":
     else:
         print(f"Ảnh test không tồn tại: {test_img_path}")
 
-    video_path = "../resource/video/test_video.mp4"
+    video_path = "../resource/video/putin.mp4"
     if os.path.exists(video_path):
         fr_system.process_video(
             video_path=video_path,
